@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Activity, Map, Anchor, Server, Calendar, 
   TrendingUp, Globe, Search, Filter, Hash,
@@ -11,7 +11,14 @@ import {
   Pie, Cell, AreaChart, Area, ComposedChart
 } from 'recharts';
 
-import cableData from './submarine_cables_complete.json';
+// Try-catch for import
+let cableData = [];
+try {
+  cableData = require('./submarine_cables_complete.json');
+  console.log('Data loaded:', cableData?.length, 'cables');
+} catch (e) {
+  console.error('Failed to load cable data:', e);
+}
 
 // --- CONFIG ---
 
@@ -33,7 +40,6 @@ const SUPPLIER_MAPPING = {
 
 const HYPERSCALERS = ['Google', 'Meta', 'Facebook', 'Microsoft', 'Amazon', 'AWS', 'SoftBank'];
 
-// ✅ FIXED: Color mapping for proper inline styles (no dynamic Tailwind classes)
 const COLOR_MAP = {
   '#3b82f6': { bg: '#eff6ff', text: '#3b82f6' },
   '#10b981': { bg: '#ecfdf5', text: '#10b981' },
@@ -66,7 +72,6 @@ const formatNumber = (num) => {
 
 // --- COMPONENTS ---
 
-// ✅ FIXED: KPICard now uses inline styles instead of dynamic Tailwind classes
 const KPICard = ({ title, value, subtext, icon: Icon, color }) => {
   const colorStyle = COLOR_MAP[color] || { bg: '#f1f5f9', text: '#64748b' };
   
@@ -103,19 +108,46 @@ const Section = ({ title, children, icon: Icon, className = "", contentHeight = 
 const Dashboard = ({ data }) => {
   const [searchTerm, setSearchTerm] = useState('');
   
+  useEffect(() => {
+    console.log('Dashboard mounted with data:', data?.length);
+    if (!data || data.length === 0) {
+      console.error('No data available!');
+    }
+  }, [data]);
+
   // --- ANALYTICS ENGINE ---
   const stats = useMemo(() => {
+    console.log('Computing stats for', data?.length, 'cables');
+    
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      console.error('Invalid data:', data);
+      return {
+        totalCables: 0,
+        totalLength: 0,
+        activeCount: 0,
+        plannedCount: 0,
+        topCountries: [],
+        topOwners: [],
+        topSuppliers: [],
+        timelineData: [],
+        supplierGeoData: [],
+        hyperscalerData: [],
+        ageData: [],
+        riskCountries: 0,
+        topPlanned: [],
+        lengthData: []
+      };
+    }
+
     let totalLength = 0;
     let plannedCount = 0;
     let activeCount = 0;
     
-    // Core stats
     const countryCounts = {};
     const ownerCounts = {};
     const supplierCounts = {};
     const cablesPerYear = {};
     
-    // Geopolitical stats
     const supplierGeoCounts = { 'USA': 0, 'Europe': 0, 'Japan': 0, 'China': 0, 'Other': 0 };
     const hyperscalerByEra = {};
     const ageDistribution = { 'Old (>20y)': 0, 'Mid-Life (10-20y)': 0, 'Modern (<10y)': 0 };
@@ -125,7 +157,6 @@ const Dashboard = ({ data }) => {
     const currentYear = new Date().getFullYear();
 
     data.forEach(cable => {
-      // 1. Length
       const len = parseLength(cable.length);
       totalLength += len;
       if (len > 0) {
@@ -134,7 +165,6 @@ const Dashboard = ({ data }) => {
           else lengthDistribution['Long (>5k)']++;
       }
 
-      // 2. Status & Age
       const rfs = cable.rfs_year ? parseInt(cable.rfs_year) : null;
       const isFuture = rfs && rfs > currentYear;
       
@@ -150,7 +180,6 @@ const Dashboard = ({ data }) => {
           }
       }
 
-      // 3. Landing Points
       if (Array.isArray(cable.landing_points)) {
         const uniqueCountries = new Set();
         cable.landing_points.forEach(pt => {
@@ -165,7 +194,6 @@ const Dashboard = ({ data }) => {
         });
       }
 
-      // 4. Owners & Hyperscalers
       const owners = splitList(cable.owners);
       let hasHyperscaler = false;
       owners.forEach(o => {
@@ -173,7 +201,6 @@ const Dashboard = ({ data }) => {
         if (HYPERSCALERS.some(h => o.includes(h))) hasHyperscaler = true;
       });
 
-      // Hyperscaler Era Analysis
       if (rfs && rfs >= 2000 && rfs <= currentYear + 5) {
           const era = `${Math.floor(rfs / 5) * 5}-${Math.floor(rfs / 5) * 5 + 4}`;
           if (!hyperscalerByEra[era]) hyperscalerByEra[era] = { era, tech: 0, other: 0, techLength: 0, otherLength: 0 };
@@ -187,13 +214,11 @@ const Dashboard = ({ data }) => {
           }
       }
 
-      // 5. Suppliers & Geopolitics
       const suppliers = splitList(cable.suppliers);
       suppliers.forEach(s => {
         if (s !== 'Unknown') {
             supplierCounts[s] = (supplierCounts[s] || 0) + 1;
             
-            // Map to region
             let region = 'Other';
             for (const [key, val] of Object.entries(SUPPLIER_MAPPING)) {
                 if (s.includes(key)) region = val;
@@ -202,15 +227,12 @@ const Dashboard = ({ data }) => {
         }
       });
 
-      // 6. Year History
       if (rfs && rfs > 1990 && rfs < 2030) {
          if (!cablesPerYear[rfs]) cablesPerYear[rfs] = { count: 0, length: 0 };
          cablesPerYear[rfs].count++;
          cablesPerYear[rfs].length += len;
       }
     });
-
-    // --- SORTING & FORMATTING ---
 
     const topCountries = Object.entries(countryCounts)
       .sort((a, b) => b[1] - a[1])
@@ -231,7 +253,6 @@ const Dashboard = ({ data }) => {
       .map(([year, data]) => ({ year: parseInt(year), count: data.count, length: data.length }))
       .sort((a, b) => a.year - b.year);
 
-    // Geopolitical Data Formatting
     const supplierGeoData = Object.entries(supplierGeoCounts)
         .map(([name, value]) => ({ name, value }))
         .sort((a, b) => b.value - a.value);
@@ -240,7 +261,6 @@ const Dashboard = ({ data }) => {
     
     const ageData = Object.entries(ageDistribution).map(([name, value]) => ({ name, value }));
     
-    // Find Single Point of Failure Countries
     const riskCountries = Object.entries(countryCounts)
         .filter(([_, count]) => count === 1)
         .length;
@@ -252,7 +272,7 @@ const Dashboard = ({ data }) => {
 
     const lengthData = Object.entries(lengthDistribution).map(([name, value]) => ({ name, value }));
 
-    return {
+    const result = {
       totalCables: data.length,
       totalLength,
       activeCount,
@@ -268,9 +288,13 @@ const Dashboard = ({ data }) => {
       topPlanned,
       lengthData
     };
+    
+    console.log('Stats computed:', result);
+    return result;
   }, [data]);
 
   const filteredCables = useMemo(() => {
+    if (!data || !Array.isArray(data)) return [];
     const lowerSearch = searchTerm.toLowerCase();
     return data.filter(c => 
         (c.name && c.name.toLowerCase().includes(lowerSearch)) ||
@@ -279,10 +303,23 @@ const Dashboard = ({ data }) => {
     ).slice(0, 100);
   }, [data, searchTerm]);
 
+  // Show error state if no data
+  if (!data || !Array.isArray(data) || data.length === 0) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-slate-800 mb-2">Data Loading Error</h2>
+          <p className="text-slate-600">Unable to load submarine cable data. Check console for details.</p>
+          <p className="text-sm text-slate-500 mt-4">Expected array, got: {typeof data}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 flex flex-col">
       
-      {/* Header */}
       <header className="bg-slate-900 text-white sticky top-0 z-30 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -299,7 +336,6 @@ const Dashboard = ({ data }) => {
 
       <main className="max-w-7xl mx-auto px-4 py-8 space-y-12 flex-1 w-full">
         
-        {/* SECTION 1: OVERVIEW */}
         <div className="space-y-6">
             <div className="flex items-center gap-2 mb-2">
                 <Activity className="w-5 h-5 text-slate-400" />
@@ -324,14 +360,14 @@ const Dashboard = ({ data }) => {
             <KPICard 
                 title="Top Hub" 
                 value={stats.topCountries[0]?.name || '-'}
-                subtext={`${stats.topCountries[0]?.count} unique connections`}
+                subtext={`${stats.topCountries[0]?.count || 0} unique connections`}
                 icon={Globe} 
                 color="#8b5cf6" 
             />
             <KPICard 
                 title="Top Supplier" 
                 value={stats.topSuppliers[0]?.name || '-'}
-                subtext={`${stats.topSuppliers[0]?.count} systems supplied`}
+                subtext={`${stats.topSuppliers[0]?.count || 0} systems supplied`}
                 icon={Server} 
                 color="#f59e0b" 
             />
@@ -340,6 +376,7 @@ const Dashboard = ({ data }) => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2">
                     <Section title="Systems RFS (Ready for Service) Timeline" icon={Calendar}>
+                    {stats.timelineData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                         <ComposedChart data={stats.timelineData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                             <defs>
@@ -350,44 +387,46 @@ const Dashboard = ({ data }) => {
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
                             <XAxis dataKey="year" tick={{fontSize: 12}} />
-                            <YAxis yAxisId="left" tick={{fontSize: 12}} allowDecimals={false} label={{ value: 'Count', angle: -90, position: 'insideLeft', style: { fill: '#64748b', fontSize: '10px' } }} />
-                            <YAxis yAxisId="right" orientation="right" tick={{fontSize: 12}} tickFormatter={(val) => `${(val/1000).toFixed(0)}k`} label={{ value: 'Length (km)', angle: 90, position: 'insideRight', style: { fill: '#ec4899', fontSize: '10px' } }} />
-                            <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none' }} />
+                            <YAxis yAxisId="left" tick={{fontSize: 12}} allowDecimals={false} />
+                            <YAxis yAxisId="right" orientation="right" tick={{fontSize: 12}} tickFormatter={(val) => `${(val/1000).toFixed(0)}k`} />
+                            <RechartsTooltip />
                             <Legend />
                             <Area yAxisId="left" type="monotone" dataKey="count" name="System Count" stroke="#3b82f6" fillOpacity={1} fill="url(#colorCount)" />
                             <Line yAxisId="right" type="monotone" dataKey="length" name="Total Length (km)" stroke="#ec4899" dot={false} strokeWidth={2} />
                         </ComposedChart>
                     </ResponsiveContainer>
+                    ) : <div className="flex items-center justify-center h-full text-slate-400">No timeline data</div>}
                     </Section>
                 </div>
                 
                 <div className="lg:col-span-1">
                     <Section title="Top 15 Connected Countries" icon={Map}>
+                    {stats.topCountries.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={stats.topCountries} layout="vertical" margin={{ left: 10, right: 10 }}>
                         <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                         <XAxis type="number" hide />
-                        <YAxis dataKey="name" type="category" width={110} tick={{fontSize: 10, fill: '#64748b'}} interval={0} />
-                        <RechartsTooltip cursor={{fill: 'transparent'}} />
+                        <YAxis dataKey="name" type="category" width={110} tick={{fontSize: 10}} interval={0} />
+                        <RechartsTooltip />
                         <Bar dataKey="count" fill="#6366f1" radius={[0, 4, 4, 0]} barSize={16} />
                         </BarChart>
                     </ResponsiveContainer>
+                    ) : <div className="flex items-center justify-center h-full text-slate-400">No country data</div>}
                     </Section>
                 </div>
             </div>
         </div>
 
-        {/* SECTION 2: GEOPOLITICS & STRATEGY */}
         <div className="space-y-6">
              <div className="flex items-center gap-2 mb-2 pt-6 border-t border-slate-200">
                 <Globe2 className="w-5 h-5 text-slate-400" />
                 <h2 className="text-xl font-bold text-slate-800">Geopolitics & Strategic Indicators</h2>
             </div>
 
-            {/* Row 1: Sovereignty & Big Tech */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Section title="Technological Sovereignty (Supplier HQ)" icon={ShieldAlert} contentHeight="h-[200px]">
                     <div className="mb-2 text-xs text-slate-400">Total systems by supplier nationality</div>
+                    {stats.supplierGeoData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={stats.supplierGeoData} layout="vertical" margin={{ left: 10, right: 20 }}>
                             <CartesianGrid strokeDasharray="3 3" horizontal={false} />
@@ -401,51 +440,46 @@ const Dashboard = ({ data }) => {
                             </Bar>
                         </BarChart>
                     </ResponsiveContainer>
+                    ) : <div className="flex items-center justify-center h-full text-slate-400">No supplier data</div>}
                 </Section>
 
                 <Section title="The Hyperscaler Shift (Big Tech vs Telco)" icon={TrendingUp} contentHeight="h-[200px]">
                     <div className="mb-2 text-xs text-slate-400">New cable builds by era & length breakdown</div>
+                    {stats.hyperscalerData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                         <ComposedChart data={stats.hyperscalerData} margin={{ top: 10, right: 10, left: -10 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
                             <XAxis dataKey="era" tick={{fontSize: 11}} />
-                            <YAxis yAxisId="left" tick={{fontSize: 11}} label={{ value: 'Count', angle: -90, position: 'insideLeft', style: { fill: '#64748b', fontSize: '10px' } }}/>
+                            <YAxis yAxisId="left" tick={{fontSize: 11}} />
                             <YAxis yAxisId="right" orientation="right" tick={{fontSize: 11}} tickFormatter={(val) => `${(val/1000).toFixed(0)}k`} />
                             <Legend wrapperStyle={{ fontSize: '11px' }} />
-                            <RechartsTooltip cursor={{fill: 'transparent'}} />
-                            
-                            {/* Stacked Bars for Count */}
+                            <RechartsTooltip />
                             <Bar yAxisId="left" dataKey="other" name="Trad. Count" stackId="a" fill="#94a3b8" barSize={32} />
                             <Bar yAxisId="left" dataKey="tech" name="Tech Count" stackId="a" fill="#3b82f6" barSize={32} />
-                            
-                            {/* Lines for Length */}
                             <Line yAxisId="right" type="monotone" dataKey="otherLength" name="Trad. Length (km)" stroke="#475569" strokeWidth={2} dot={false} strokeDasharray="4 2" />
                             <Line yAxisId="right" type="monotone" dataKey="techLength" name="Tech Length (km)" stroke="#2563eb" strokeWidth={2} dot={false} />
                         </ComposedChart>
                     </ResponsiveContainer>
+                    ) : <div className="flex items-center justify-center h-full text-slate-400">No hyperscaler data</div>}
                 </Section>
             </div>
 
-            {/* Row 2: Vulnerability & Future */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div className="lg:col-span-1">
                      <Section title="Infrastructure Age Risk" icon={Clock} contentHeight="h-[180px]">
-                        <div className="flex-1 h-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie data={stats.ageData} innerRadius={40} outerRadius={70} paddingAngle={2} dataKey="value">
-                                        <Cell fill="#ef4444" /> {/* Old */}
-                                        <Cell fill="#f59e0b" /> {/* Mid */}
-                                        <Cell fill="#10b981" /> {/* Modern */}
-                                    </Pie>
-                                    <RechartsTooltip />
-                                    <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{fontSize: '10px'}}/>
-                                </PieChart>
-                            </ResponsiveContainer>
-                        </div>
-                        <div className="text-center text-xs text-slate-500 -mt-2">
-                             {stats.ageData.find(d => d.name.includes('Old'))?.value} systems nearing end-of-life (>20y)
-                        </div>
+                        {stats.ageData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie data={stats.ageData} innerRadius={40} outerRadius={70} paddingAngle={2} dataKey="value">
+                                    <Cell fill="#ef4444" />
+                                    <Cell fill="#f59e0b" />
+                                    <Cell fill="#10b981" />
+                                </Pie>
+                                <RechartsTooltip />
+                                <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{fontSize: '10px'}}/>
+                            </PieChart>
+                        </ResponsiveContainer>
+                        ) : <div className="flex items-center justify-center h-full text-slate-400">No age data</div>}
                     </Section>
                 </div>
 
@@ -453,7 +487,7 @@ const Dashboard = ({ data }) => {
                      <KPICard 
                         title="Vulnerable Nations" 
                         value={stats.riskCountries}
-                        subtext="Countries with only 1 cable connection (Single Point of Failure)"
+                        subtext="Countries with only 1 cable connection"
                         icon={AlertCircle} 
                         color="#ef4444" 
                     />
@@ -461,7 +495,7 @@ const Dashboard = ({ data }) => {
                         <KPICard 
                             title="Strategic Reach" 
                             value={stats.lengthData.find(d => d.name.includes('Long'))?.value || 0}
-                            subtext="Long-haul (>5k km) intercontinental systems"
+                            subtext="Long-haul (>5k km) systems"
                             icon={BarChart2} 
                             color="#6366f1" 
                         />
@@ -470,21 +504,22 @@ const Dashboard = ({ data }) => {
 
                 <div className="lg:col-span-2">
                     <Section title="Future Battlegrounds: Top Planned Projects" icon={Navigation}>
+                        {stats.topPlanned.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
                              <BarChart data={stats.topPlanned} layout="vertical" margin={{ left: 10, right: 10 }}>
                                 <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                                 <XAxis type="number" hide />
                                 <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 10}} interval={0} />
-                                <RechartsTooltip cursor={{fill: 'transparent'}} />
-                                <Bar dataKey="count" fill="#ec4899" radius={[0, 4, 4, 0]} barSize={12} name="Planned Landing Points" />
+                                <RechartsTooltip />
+                                <Bar dataKey="count" fill="#ec4899" radius={[0, 4, 4, 0]} barSize={12} />
                             </BarChart>
                         </ResponsiveContainer>
+                        ) : <div className="flex items-center justify-center h-full text-slate-400">No planned projects</div>}
                     </Section>
                 </div>
             </div>
         </div>
 
-        {/* SECTION 3: DATA BROWSER */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[600px]">
           <div className="p-4 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
              <h3 className="font-semibold text-slate-800 flex items-center gap-2">
@@ -551,7 +586,6 @@ const Dashboard = ({ data }) => {
 
       </main>
 
-      {/* FOOTER */}
       <footer className="bg-slate-900 text-slate-400 py-6 text-sm border-t border-slate-800">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
