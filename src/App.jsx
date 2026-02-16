@@ -11,14 +11,21 @@ import {
   Pie, Cell, AreaChart, Area, ComposedChart
 } from 'recharts';
 
-// Try-catch for import
+// Import the JSON - it's likely an object with a "cables" or "data" property
+import rawData from './submarine_cables_complete.json';
+
+// Extract the array from the imported data
 let cableData = [];
-try {
-  cableData = require('./submarine_cables_complete.json');
-  console.log('Data loaded:', cableData?.length, 'cables');
-} catch (e) {
-  console.error('Failed to load cable data:', e);
+if (Array.isArray(rawData)) {
+  cableData = rawData;
+} else if (rawData && typeof rawData === 'object') {
+  // Try common property names
+  cableData = rawData.cables || rawData.data || rawData.features || Object.values(rawData);
 }
+
+console.log('Raw data type:', typeof rawData);
+console.log('Raw data keys:', Object.keys(rawData || {}));
+console.log('Cable data length:', cableData?.length);
 
 // --- CONFIG ---
 
@@ -110,17 +117,14 @@ const Dashboard = ({ data }) => {
   
   useEffect(() => {
     console.log('Dashboard mounted with data:', data?.length);
-    if (!data || data.length === 0) {
-      console.error('No data available!');
+    if (data && data.length > 0) {
+      console.log('First cable sample:', data[0]);
     }
   }, [data]);
 
   // --- ANALYTICS ENGINE ---
   const stats = useMemo(() => {
-    console.log('Computing stats for', data?.length, 'cables');
-    
     if (!data || !Array.isArray(data) || data.length === 0) {
-      console.error('Invalid data:', data);
       return {
         totalCables: 0,
         totalLength: 0,
@@ -272,7 +276,7 @@ const Dashboard = ({ data }) => {
 
     const lengthData = Object.entries(lengthDistribution).map(([name, value]) => ({ name, value }));
 
-    const result = {
+    return {
       totalCables: data.length,
       totalLength,
       activeCount,
@@ -288,9 +292,6 @@ const Dashboard = ({ data }) => {
       topPlanned,
       lengthData
     };
-    
-    console.log('Stats computed:', result);
-    return result;
   }, [data]);
 
   const filteredCables = useMemo(() => {
@@ -307,11 +308,15 @@ const Dashboard = ({ data }) => {
   if (!data || !Array.isArray(data) || data.length === 0) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-center">
+        <div className="text-center p-8">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-slate-800 mb-2">Data Loading Error</h2>
-          <p className="text-slate-600">Unable to load submarine cable data. Check console for details.</p>
-          <p className="text-sm text-slate-500 mt-4">Expected array, got: {typeof data}</p>
+          <p className="text-slate-600 mb-4">Unable to load submarine cable data.</p>
+          <div className="bg-slate-800 text-slate-100 p-4 rounded text-left text-xs font-mono max-w-2xl">
+            <div>Raw data type: {typeof rawData}</div>
+            <div>Available keys: {Object.keys(rawData || {}).join(', ')}</div>
+            <div>Data length: {data?.length || 0}</div>
+          </div>
         </div>
       </div>
     );
