@@ -17,11 +17,11 @@ import cableData from './submarine_cables_complete.json';
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#6366f1', '#14b8a6', '#f97316'];
 const GEO_COLORS = {
-  'USA': '#3b82f6',     // Blue
-  'Europe': '#10b981',  // Emerald
-  'Japan': '#f43f5e',   // Rose
-  'China': '#f59e0b',   // Amber
-  'Other': '#94a3b8'    // Slate
+  'USA': '#3b82f6',
+  'Europe': '#10b981',
+  'Japan': '#f43f5e',
+  'China': '#f59e0b',
+  'Other': '#94a3b8'
 };
 
 const SUPPLIER_MAPPING = {
@@ -32,6 +32,16 @@ const SUPPLIER_MAPPING = {
 };
 
 const HYPERSCALERS = ['Google', 'Meta', 'Facebook', 'Microsoft', 'Amazon', 'AWS', 'SoftBank'];
+
+// ✅ FIXED: Color mapping for proper inline styles (no dynamic Tailwind classes)
+const COLOR_MAP = {
+  '#3b82f6': { bg: '#eff6ff', text: '#3b82f6' },
+  '#10b981': { bg: '#ecfdf5', text: '#10b981' },
+  '#8b5cf6': { bg: '#f5f3ff', text: '#8b5cf6' },
+  '#f59e0b': { bg: '#fffbeb', text: '#f59e0b' },
+  '#ef4444': { bg: '#fef2f2', text: '#ef4444' },
+  '#6366f1': { bg: '#eef2ff', text: '#6366f1' }
+};
 
 // --- UTILS ---
 
@@ -56,20 +66,25 @@ const formatNumber = (num) => {
 
 // --- COMPONENTS ---
 
-const KPICard = ({ title, value, subtext, icon: Icon, color }) => (
-  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-    <div className="flex items-start justify-between">
-      <div>
-        <p className="text-sm font-medium text-slate-500 mb-1">{title}</p>
-        <h3 className="text-2xl font-bold text-slate-800">{value}</h3>
+// ✅ FIXED: KPICard now uses inline styles instead of dynamic Tailwind classes
+const KPICard = ({ title, value, subtext, icon: Icon, color }) => {
+  const colorStyle = COLOR_MAP[color] || { bg: '#f1f5f9', text: '#64748b' };
+  
+  return (
+    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-sm font-medium text-slate-500 mb-1">{title}</p>
+          <h3 className="text-2xl font-bold text-slate-800">{value}</h3>
+        </div>
+        <div className="p-2 rounded-lg" style={{ backgroundColor: colorStyle.bg, color: colorStyle.text }}>
+          <Icon className="w-5 h-5" />
+        </div>
       </div>
-      <div className={`p-2 rounded-lg bg-${color}-50`} style={{ backgroundColor: `${color}15`, color: color }}>
-        <Icon className="w-5 h-5" />
-      </div>
+      {subtext && <p className="text-xs text-slate-400 mt-2">{subtext}</p>}
     </div>
-    {subtext && <p className="text-xs text-slate-400 mt-2">{subtext}</p>}
-  </div>
-);
+  );
+};
 
 const Section = ({ title, children, icon: Icon, className = "", contentHeight = "h-[300px]" }) => (
   <div className={`bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col ${className}`}>
@@ -98,12 +113,11 @@ const Dashboard = ({ data }) => {
     const countryCounts = {};
     const ownerCounts = {};
     const supplierCounts = {};
-    const cablesPerYear = {}; // { year: { count: 0, length: 0 } }
+    const cablesPerYear = {};
     
     // Geopolitical stats
     const supplierGeoCounts = { 'USA': 0, 'Europe': 0, 'Japan': 0, 'China': 0, 'Other': 0 };
-    // Hyperscaler analysis: split lengths
-    const hyperscalerByEra = {}; // { '2010-2014': { tech: 0, other: 0, techLength: 0, otherLength: 0 } }
+    const hyperscalerByEra = {};
     const ageDistribution = { 'Old (>20y)': 0, 'Mid-Life (10-20y)': 0, 'Modern (<10y)': 0 };
     const plannedByCountry = {};
     const lengthDistribution = { 'Short (<1k km)': 0, 'Regional (1k-5k)': 0, 'Long (>5k)': 0 };
@@ -247,7 +261,6 @@ const Dashboard = ({ data }) => {
       topOwners,
       topSuppliers,
       timelineData,
-      // Geo
       supplierGeoData,
       hyperscalerData,
       ageData,
@@ -284,7 +297,7 @@ const Dashboard = ({ data }) => {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-8 space-y-12 animate-in fade-in duration-500 flex-1 w-full">
+      <main className="max-w-7xl mx-auto px-4 py-8 space-y-12 flex-1 w-full">
         
         {/* SECTION 1: OVERVIEW */}
         <div className="space-y-6">
@@ -431,7 +444,7 @@ const Dashboard = ({ data }) => {
                             </ResponsiveContainer>
                         </div>
                         <div className="text-center text-xs text-slate-500 -mt-2">
-                             {stats.ageData.find(d => d.name.includes('Old'))?.value} systems nearing end-of-life ({'>'}20y)
+                             {stats.ageData.find(d => d.name.includes('Old'))?.value} systems nearing end-of-life (>20y)
                         </div>
                     </Section>
                 </div>
@@ -448,7 +461,7 @@ const Dashboard = ({ data }) => {
                         <KPICard 
                             title="Strategic Reach" 
                             value={stats.lengthData.find(d => d.name.includes('Long'))?.value || 0}
-                            subtext="Long-haul ({'>'}5k km) intercontinental systems"
+                            subtext="Long-haul (>5k km) intercontinental systems"
                             icon={BarChart2} 
                             color="#6366f1" 
                         />
@@ -559,7 +572,5 @@ const Dashboard = ({ data }) => {
 };
 
 export default function App() {
-  // Directly render Dashboard with imported data
-  // The 'data' prop is hardcoded from the import above
   return <Dashboard data={cableData || []} />;
 }
