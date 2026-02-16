@@ -76,7 +76,3 @@ Data provided by TeleGeography. This application is for educational and analytic
 The source code for this project is distributed under the MIT License. See `LICENSE` for more information.
 
 **Note regarding data**: The cable dataset is sourced from TeleGeography. This data is likely subject to its own copyright and usage terms. It is not covered by this project's MIT license.
-
-***
-
-Your README is now formatted in standard Markdown with proper hierarchy, code blocks, and structure. Would you like me to add additional sections like a contributing guide or troubleshooting tips?
