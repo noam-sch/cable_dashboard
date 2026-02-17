@@ -17,7 +17,6 @@ let cableData = [];
 if (Array.isArray(rawData)) cableData = rawData;
 else if (rawData && typeof rawData === 'object') cableData = rawData.cables || rawData.data || rawData.features || Object.values(rawData);
 
-/* ═══ GLOBAL CSS RESET ═══ */
 const GLOBAL_CSS = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body, #root, #app, main, [data-reactroot] {
@@ -28,7 +27,6 @@ const GLOBAL_CSS = `
   @media (max-width: 640px) { html { font-size: 14px; } }
 `;
 
-// ── Config ──
 const GEO_COLORS = { USA: '#3b82f6', Europe: '#10b981', Japan: '#f43f5e', China: '#f59e0b', Other: '#94a3b8' };
 const SUPPLIER_MAPPING = {
   SubCom: 'USA', 'TE SubCom': 'USA', Tyco: 'USA', Simplex: 'USA',
@@ -55,19 +53,16 @@ const REGION_MAP = {
 };
 const RC = { 'N. America': '#3b82f6', 'S. America': '#8b5cf6', Europe: '#10b981', 'E. Asia': '#f43f5e', 'S. Asia': '#f59e0b', 'SE Asia': '#14b8a6', Oceania: '#6366f1', 'Middle East': '#ec4899', Africa: '#f97316' };
 
-// ── Utils ──
 const parseLen = v => { if (v == null) return 0; if (typeof v === 'number') return v; return Number(String(v).replace(/km/gi, '').replace(/,/g, '').trim()) || 0; };
 const splitList = s => (!s || typeof s !== 'string') ? ['Unknown'] : s.split(/[,/]+/).map(x => x.trim()).filter(x => x.length && x !== 'null');
 const fmt = n => { if (!n) return '0'; if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M'; if (n >= 1e3) return (n / 1e3).toFixed(1) + 'k'; return n.toLocaleString(); };
 
-// ── Hooks ──
 const useW = () => {
   const [w, setW] = useState(typeof window !== 'undefined' ? window.innerWidth : 1400);
   useEffect(() => { let t; const h = () => { clearTimeout(t); t = setTimeout(() => setW(window.innerWidth), 80); }; window.addEventListener('resize', h); return () => { window.removeEventListener('resize', h); clearTimeout(t); }; }, []);
   return w;
 };
 
-// ── ChartBox ──
 const ChartBox = ({ h, children }) => {
   const ref = useRef(null);
   const [ok, setOk] = useState(false);
@@ -80,32 +75,30 @@ const ChartBox = ({ h, children }) => {
   return <div ref={ref} style={{ width: '100%', height: h, minHeight: h }}>{ok && <ResponsiveContainer width="100%" height={h}>{children}</ResponsiveContainer>}</div>;
 };
 
-// ── Info Tooltip ──
+/* ── InfoTip: opens DOWNWARD so it's never clipped by card overflow ── */
 const InfoTip = ({ text }) => {
   const [show, setShow] = useState(false);
   return (
-    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', marginLeft: 6, cursor: 'pointer' }}
+    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', marginLeft: 5, cursor: 'pointer', zIndex: show ? 100 : 1 }}
       onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}
       onClick={() => setShow(p => !p)}>
       <Info size={13} color="#94a3b8" />
       {show && (
         <span style={{
-          position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
-          marginBottom: 6, padding: '8px 12px', background: '#1e293b', color: '#e2e8f0',
-          borderRadius: 8, fontSize: 11, lineHeight: 1.5, width: 240, zIndex: 50,
-          boxShadow: '0 8px 24px rgba(0,0,0,.2)', whiteSpace: 'normal', textAlign: 'left',
-          pointerEvents: 'none',
+          position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)',
+          marginTop: 8, padding: '10px 14px', background: '#1e293b', color: '#e2e8f0',
+          borderRadius: 8, fontSize: 11, lineHeight: 1.5, width: 260, zIndex: 100,
+          boxShadow: '0 8px 24px rgba(0,0,0,.25)', whiteSpace: 'normal', textAlign: 'left',
         }}>
+          <span style={{ position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
+            borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '6px solid #1e293b' }} />
           {text}
-          <span style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)',
-            borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '6px solid #1e293b' }} />
         </span>
       )}
     </span>
   );
 };
 
-// ── Atoms ──
 const ttp = { borderRadius: 8, border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,.08)', fontSize: 12 };
 
 const KPI = ({ title, value, sub, icon: I, color }) => {
@@ -124,25 +117,23 @@ const KPI = ({ title, value, sub, icon: I, color }) => {
   );
 };
 
-const Card = ({ title, icon: I, children, sub, infoTip }) => (
-  <div style={{ background: '#fff', padding: '14px 16px', borderRadius: 10, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: sub ? 1 : 8, paddingBottom: sub ? 0 : 8, borderBottom: sub ? 'none' : '1px solid #f1f5f9' }}>
+/* Card: overflow is now VISIBLE so tooltips aren't clipped */
+const Card = ({ title, icon: I, children, sub, tip }) => (
+  <div style={{ background: '#fff', padding: '14px 16px', borderRadius: 10, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', overflow: 'visible', minWidth: 0, position: 'relative' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: sub ? 1 : 8, paddingBottom: sub ? 0 : 8, borderBottom: sub ? 'none' : '1px solid #f1f5f9', position: 'relative', zIndex: 20 }}>
       {I && <I size={14} color="#3b82f6" />}
       <h3 style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', margin: 0 }}>{title}</h3>
-      {infoTip && <InfoTip text={infoTip} />}
+      {tip && <InfoTip text={tip} />}
     </div>
     {sub && <p style={{ fontSize: 10, color: '#94a3b8', margin: '0 0 6px' }}>{sub}</p>}
-    <div style={{ flex: 1, minWidth: 0 }}>{children}</div>
+    <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>{children}</div>
   </div>
 );
 
-// ── Dashboard ──
 const Dashboard = ({ data }) => {
   const [search, setSearch] = useState('');
   const w = useW();
-  const mob = w < 640;
-  const sm = w < 900;
-  const md = w < 1200;
+  const mob = w < 640, sm = w < 900, md = w < 1200;
   const g = mob ? 10 : sm ? 12 : 16;
   const px = mob ? 12 : sm ? 20 : md ? 32 : 48;
 
@@ -151,11 +142,8 @@ const Dashboard = ({ data }) => {
     if (!document.getElementById(id)) { const s = document.createElement('style'); s.id = id; s.textContent = GLOBAL_CSS; document.head.appendChild(s); }
   }, []);
 
-  const grid = (desktop, tablet, mobile) => ({
-    display: 'grid', gridTemplateColumns: mob ? (mobile || '1fr') : sm ? (tablet || desktop) : desktop, gap: g,
-  });
+  const grid = (desktop, tablet, mobile) => ({ display: 'grid', gridTemplateColumns: mob ? (mobile || '1fr') : sm ? (tablet || desktop) : desktop, gap: g });
 
-  // ── Analytics ──
   const stats = useMemo(() => {
     if (!data?.length) return null;
     let totalLen = 0, planned = 0, active = 0;
@@ -174,7 +162,6 @@ const Dashboard = ({ data }) => {
       const rfs = c.rfs_year ? parseInt(c.rfs_year) : null;
       const fut = rfs && rfs > now;
       if (c.is_planned || fut) planned++; else { active++; if (rfs) { const a = now - rfs; if (a > 20) age['Old (>20y)']++; else if (a > 10) age['Mid (10-20y)']++; else age['Modern (<10y)']++; } }
-
       const cSet = new Set();
       if (Array.isArray(c.landing_points)) {
         c.landing_points.forEach(p => { if (p?.country) cSet.add(p.country); });
@@ -183,30 +170,26 @@ const Dashboard = ({ data }) => {
         const ra = [...regs].sort();
         for (let i = 0; i < ra.length; i++) for (let j = i + 1; j < ra.length; j++) { const k = `${ra[i]} ↔ ${ra[j]}`; rp[k] = (rp[k] || 0) + 1; }
       }
-
       const owners = splitList(c.owners); let hasH = false;
       owners.forEach(o => { if (o !== 'Unknown') oc[o] = (oc[o] || 0) + 1; if (HYPERSCALERS.some(h => o.includes(h))) hasH = true; });
       const on = owners.filter(o => o !== 'Unknown').length;
       if (on <= 1) ot['Solo-owned']++; else if (on <= 3) ot['Small (2-3)']++; else if (on <= 5) ot['Consortium (4-5)']++; else ot['Mega (6+)']++;
-
       if (rfs && rfs >= 2000 && rfs <= now + 5) {
         const era = `${Math.floor(rfs / 5) * 5}-${Math.floor(rfs / 5) * 5 + 4}`;
         if (!hbe[era]) hbe[era] = { era, tech: 0, other: 0, techLength: 0, otherLength: 0 };
         if (hasH) { hbe[era].tech++; hbe[era].techLength += len; } else { hbe[era].other++; hbe[era].otherLength += len; }
       }
-
       const sups = splitList(c.suppliers);
       sups.forEach(s => { if (s !== 'Unknown') { sc[s] = (sc[s] || 0) + 1; let r = 'Other'; for (const [k, v] of Object.entries(SUPPLIER_MAPPING)) { if (s.includes(k)) r = v; } sgc[r]++; } });
       if (rfs && rfs >= 1995 && rfs <= 2029) {
         const era = `${Math.floor(rfs / 5) * 5}s`;
         if (!sbe[era]) sbe[era] = { era, ASN: 0, SubCom: 0, NEC: 0, 'HMN Tech': 0, Other: 0 };
-        let m = false;
         sups.forEach(s => {
-          if (s.includes('ASN') || s.includes('Alcatel')) { sbe[era].ASN++; m = true; }
-          else if (s.includes('SubCom') || s.includes('Tyco') || s.includes('TE Sub')) { sbe[era].SubCom++; m = true; }
-          else if (s.includes('NEC')) { sbe[era].NEC++; m = true; }
-          else if (s.includes('HMN') || s.includes('Huawei') || s.includes('Hengtong')) { sbe[era]['HMN Tech']++; m = true; }
-          else if (s !== 'Unknown') { sbe[era].Other++; m = true; }
+          if (s.includes('ASN') || s.includes('Alcatel')) sbe[era].ASN++;
+          else if (s.includes('SubCom') || s.includes('Tyco') || s.includes('TE Sub')) sbe[era].SubCom++;
+          else if (s.includes('NEC')) sbe[era].NEC++;
+          else if (s.includes('HMN') || s.includes('Huawei') || s.includes('Hengtong')) sbe[era]['HMN Tech']++;
+          else if (s !== 'Unknown') sbe[era].Other++;
         });
       }
       if (rfs && rfs > 1990 && rfs < 2030) { if (!yc[rfs]) yc[rfs] = { count: 0, length: 0 }; yc[rfs].count++; yc[rfs].length += len; }
@@ -217,7 +200,6 @@ const Dashboard = ({ data }) => {
 
     return {
       totalCables: data.length, totalLen, active, planned,
-      // FIX: Top 20 countries instead of 15 — so China, India, Taiwan, Canada all show
       topCountries: Object.entries(cc).sort((a, b) => b[1] - a[1]).slice(0, 20).map(([n, c]) => ({ name: n, count: c })),
       topSuppliers: Object.entries(sc).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([n, c]) => ({ name: n, count: c })),
       timeline: Object.entries(yc).map(([y, d]) => ({ year: +y, count: d.count, length: d.length })).sort((a, b) => a.year - b.year),
@@ -240,7 +222,7 @@ const Dashboard = ({ data }) => {
     return data.filter(c => c.name?.toLowerCase().includes(s) || c.owners?.toLowerCase().includes(s) || c.landing_points?.some(p => p.country?.toLowerCase().includes(s))).slice(0, 100);
   }, [data, search]);
 
-  if (!stats) return <div style={{ minHeight: '100vh', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><AlertCircle size={48} color="#ef4444" /><p style={{ marginLeft: 12, fontSize: 16 }}>No cable data found</p></div>;
+  if (!stats) return <div style={{ minHeight: '100vh', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><AlertCircle size={48} color="#ef4444" /><p style={{ marginLeft: 12 }}>No data</p></div>;
 
   const PA = ['#ef4444', '#f59e0b', '#10b981'];
   const PO = ['#3b82f6', '#6366f1', '#ec4899', '#f59e0b'];
@@ -251,7 +233,6 @@ const Dashboard = ({ data }) => {
   return (
     <div style={{ width: '100%', minHeight: '100vh', background: '#f8fafc', color: '#1e293b', display: 'flex', flexDirection: 'column' }}>
 
-      {/* HEADER */}
       <header style={{ width: '100%', background: 'linear-gradient(135deg,#0f172a,#1e293b)', color: '#fff', position: 'sticky', top: 0, zIndex: 30, boxShadow: '0 2px 8px rgba(0,0,0,.2)' }}>
         <div style={{ ...wrap, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -274,7 +255,8 @@ const Dashboard = ({ data }) => {
             <KPI title="Top Supplier" value={stats.topSuppliers[0]?.name || '-'} sub={`${stats.topSuppliers[0]?.count || 0} systems`} icon={Server} color="#f59e0b" />
           </div>
           <div style={{ ...grid('1fr 1fr', '1fr 1fr', '1fr'), marginTop: g }}>
-            <Card title="Systems RFS Timeline" icon={Calendar}>
+            <Card title="Cable Deployments Over Time" icon={Calendar}
+              tip="Number of new cable systems reaching Ready for Service (RFS) each year, with total combined length. Shows both the dot-com era boom of the early 2000s and the current hyperscaler-driven wave.">
               <ChartBox h={ch(300)}>
                 <ComposedChart data={stats.timeline} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                   <defs><linearGradient id="gc" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={.7} /><stop offset="95%" stopColor="#3b82f6" stopOpacity={0} /></linearGradient></defs>
@@ -289,8 +271,8 @@ const Dashboard = ({ data }) => {
                 </ComposedChart>
               </ChartBox>
             </Card>
-            {/* FIX: Now "Top 20" instead of "Top 15" — China, India, Taiwan, Canada included */}
-            <Card title="Top 20 Connected Countries" icon={Map}>
+            <Card title="Top 20 Connected Countries" icon={Map}
+              tip="Countries ranked by the number of distinct submarine cable systems with at least one landing point in that country. The US leads with 120 connections, while China has 24.">
               <ChartBox h={ch(400)}>
                 <BarChart data={stats.topCountries} layout="vertical" margin={{ left: 0, right: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
@@ -308,7 +290,9 @@ const Dashboard = ({ data }) => {
         <section style={{ marginBottom: 32 }}>
           <h2 style={{ fontSize: mob ? 14 : 16, fontWeight: 700, margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 6, paddingTop: 16, borderTop: '1px solid #e2e8f0' }}><Globe2 size={15} color="#64748b" />Geopolitics & Strategy</h2>
           <div style={grid('1fr 1fr', '1fr 1fr', '1fr')}>
-            <Card title="Supplier HQ Sovereignty" icon={ShieldAlert} sub="Systems by supplier nationality">
+            <Card title="Supplier Nationality" icon={ShieldAlert}
+              sub="Systems by supplier HQ country"
+              tip="Each cable's manufacturer is mapped to its headquarters region. Europe (ASN/Alcatel/Prysmian) and USA (SubCom) dominate, with China's HMN Tech growing since 2015.">
               <ChartBox h={ch(200)}>
                 <BarChart data={stats.supplierGeo} layout="vertical" margin={{ left: 5, right: 15 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
@@ -321,7 +305,9 @@ const Dashboard = ({ data }) => {
                 </BarChart>
               </ChartBox>
             </Card>
-            <Card title="Hyperscaler Shift" icon={TrendingUp} sub="Big Tech vs Traditional — count & total km by era">
+            <Card title="Big Tech vs. Traditional Telcos" icon={TrendingUp}
+              sub="Cable builds by 5-year era"
+              tip="Compares cables with at least one hyperscaler owner (Google, Meta, Microsoft, Amazon) vs. traditional telco-owned systems. Bars show system count (left axis), lines show total km deployed (right axis).">
               <ChartBox h={ch(200)}>
                 <ComposedChart data={stats.hyperscaler} margin={{ top: 5, right: 5, left: -12, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -339,7 +325,8 @@ const Dashboard = ({ data }) => {
             </Card>
           </div>
           <div style={{ ...grid('1fr 1fr 2fr', '1fr 1fr', '1fr'), marginTop: g }}>
-            <Card title="Infrastructure Age" icon={Clock}>
+            <Card title="Cable Age Distribution" icon={Clock}
+              tip="Active (non-planned) cables grouped by age. Cables older than 20 years may face higher fault risk and lower capacity. Based on the difference between the current year and each cable's RFS year.">
               <ChartBox h={ch(210)}>
                 <PieChart><Pie data={stats.ageData} innerRadius={mob ? 25 : 34} outerRadius={mob ? 50 : 62} paddingAngle={3} dataKey="value" cx="50%" cy="42%">{stats.ageData.map((_, i) => <Cell key={i} fill={PA[i]} />)}</Pie><RTooltip contentStyle={ttp} /><Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: 10 }} /></PieChart>
               </ChartBox>
@@ -349,7 +336,8 @@ const Dashboard = ({ data }) => {
               <KPI title="Strategic Reach" value={stats.lengthData.find(d => d.name.includes('>5k'))?.value || 0} sub="Long-haul (>5k km) systems" icon={BarChart2} color="#6366f1" />
             </div>
             <div style={sm && !mob ? { gridColumn: '1 / -1' } : {}}>
-              <Card title="Top Planned Projects by Country" icon={Navigation}>
+              <Card title="Planned Projects by Country" icon={Navigation}
+                tip="Countries with the most cable systems currently marked as planned or with a future RFS date. Indicates where new infrastructure investment is being directed.">
                 <ChartBox h={ch(230)}>
                   <BarChart data={stats.topPlanned} layout="vertical" margin={{ left: 0, right: 8 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
@@ -366,9 +354,11 @@ const Dashboard = ({ data }) => {
 
         {/* DEEP DIVE */}
         <section style={{ marginBottom: 32 }}>
-          <h2 style={{ fontSize: mob ? 14 : 16, fontWeight: 700, margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 6, paddingTop: 16, borderTop: '1px solid #e2e8f0' }}><Shield size={15} color="#64748b" />Deep Dive: Power, Risk & Control</h2>
+          <h2 style={{ fontSize: mob ? 14 : 16, fontWeight: 700, margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 6, paddingTop: 16, borderTop: '1px solid #e2e8f0' }}><Shield size={15} color="#64748b" />Deep Dive: Infrastructure & Risk</h2>
           <div style={grid('1fr 1fr', '1fr 1fr', '1fr')}>
-            <Card title="Cross-Continental Corridors" icon={Link2} sub="Region-to-region cable routes — who's wired to whom">
+            <Card title="Cross-Regional Routes" icon={Link2}
+              sub="Cable connections between world regions"
+              tip="Counts the number of distinct cable systems that connect two different world regions. Each cable's landing countries are mapped to regions (N. America, Europe, E. Asia, etc.), then each unique region pair is counted once per cable.">
               <ChartBox h={ch(300)}>
                 <BarChart data={stats.corridors} layout="vertical" margin={{ left: 5, right: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
@@ -381,8 +371,9 @@ const Dashboard = ({ data }) => {
                 </BarChart>
               </ChartBox>
             </Card>
-            {/* FIX: Supplier Arms Race — "Other" now counted properly and uses distinct purple color */}
-            <Card title="Supplier Arms Race" icon={TrendingUp} sub="Market dominance shifts — who builds the internet?">
+            <Card title="Supplier Market Share Over Time" icon={TrendingUp}
+              sub="Major manufacturers by era"
+              tip="Cables grouped into 5-year eras by RFS date. Each cable's supplier is mapped to one of the 4 major manufacturers or 'Other'. ASN (now part of Nokia) includes Alcatel-Lucent. SubCom includes legacy Tyco. HMN Tech includes Huawei Marine.">
               <ChartBox h={ch(300)}>
                 <AreaChart data={stats.supplierEra} margin={{ top: 5, right: 5, left: -12, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -400,14 +391,16 @@ const Dashboard = ({ data }) => {
             </Card>
           </div>
           <div style={{ ...grid('1fr 1fr', '1fr 1fr', '1fr'), marginTop: g }}>
-            {/* FIX: Info tooltip explaining ownership categorization */}
-            <Card title="Who Controls the Pipes?" icon={Users} sub="Ownership concentration — solo vs consortiums"
-              infoTip="Categorized by the number of distinct owners listed per cable in TeleGeography's data. Solo-owned = 1 entity. Small consortium = 2-3 owners. Consortium = 4-5 owners. Mega-consortium = 6+ owners (e.g. SEA-ME-WE cables with 15+ telcos).">
+            <Card title="Ownership Structure" icon={Users}
+              sub="How cables are owned"
+              tip="Based on the number of distinct owners listed per cable. Solo-owned = 1 entity (e.g. Google's Dunant). Small = 2-3 co-owners. Consortium = 4-5 partners. Mega = 6+ owners (e.g. SEA-ME-WE systems with 15+ telcos sharing a single cable).">
               <ChartBox h={ch(220)}>
                 <PieChart><Pie data={stats.ownership} innerRadius={mob ? 24 : 32} outerRadius={mob ? 52 : 64} paddingAngle={3} dataKey="value" cx="50%" cy="42%">{stats.ownership.map((_, i) => <Cell key={i} fill={PO[i]} />)}</Pie><RTooltip contentStyle={ttp} /><Legend verticalAlign="bottom" height={40} iconType="circle" wrapperStyle={{ fontSize: 10 }} /></PieChart>
               </ChartBox>
             </Card>
-            <Card title="Digital Vulnerability Index" icon={AlertCircle} sub="Countries by cable redundancy — how many are one cut from darkness?">
+            <Card title="Country Redundancy" icon={AlertCircle}
+              sub="Cable connections per country"
+              tip="Groups all 186 countries in the dataset by how many submarine cables serve them. Countries with only 1 or 2 cables are at high risk — a single cable cut or ship anchor drag could sever their international connectivity.">
               <ChartBox h={ch(220)}>
                 <BarChart data={stats.vulnerability} margin={{ top: 5, right: 8, left: -8, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -458,7 +451,6 @@ const Dashboard = ({ data }) => {
         </section>
       </main>
 
-      {/* FOOTER */}
       <footer style={{ width: '100%', background: '#0f172a', color: '#94a3b8', padding: '14px 0', fontSize: 11, borderTop: '1px solid #1e293b', marginTop: 16 }}>
         <div style={{ ...wrap, display: 'flex', flexDirection: mob ? 'column' : 'row', alignItems: mob ? 'flex-start' : 'center', justifyContent: 'space-between', gap: 8 }}>
           <span>Data sourced from <a href="https://www.submarinecablemap.com/" target="_blank" rel="noreferrer" style={{ color: '#60a5fa', textDecoration: 'none' }}>TeleGeography's</a> publicly available Submarine Cable Map</span>
