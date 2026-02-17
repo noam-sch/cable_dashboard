@@ -3,7 +3,7 @@ import {
   Activity, Map, Anchor, Server, Calendar,
   TrendingUp, Globe, Search, Zap, Navigation,
   AlertCircle, ShieldAlert, Clock, BarChart2, Globe2,
-  Mail, Link2, Users, Shield
+  Mail, Link2, Users, Shield, Info
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
@@ -17,28 +17,18 @@ let cableData = [];
 if (Array.isArray(rawData)) cableData = rawData;
 else if (rawData && typeof rawData === 'object') cableData = rawData.cables || rawData.data || rawData.features || Object.values(rawData);
 
-/* ═══════════════════════════════════════════
-   GLOBAL CSS RESET — force full-width layout
-   This overrides any framework/template CSS
-   that might be constraining the app width
-   ═══════════════════════════════════════════ */
+/* ═══ GLOBAL CSS RESET ═══ */
 const GLOBAL_CSS = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body, #root, #app, main, [data-reactroot] {
-    width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    overflow-x: hidden;
+    width: 100% !important; max-width: 100% !important;
+    margin: 0 !important; padding: 0 !important; overflow-x: hidden;
   }
   body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #f8fafc; }
-  @media (max-width: 640px) {
-    html { font-size: 14px; }
-  }
+  @media (max-width: 640px) { html { font-size: 14px; } }
 `;
 
 // ── Config ──
-
 const GEO_COLORS = { USA: '#3b82f6', Europe: '#10b981', Japan: '#f43f5e', China: '#f59e0b', Other: '#94a3b8' };
 const SUPPLIER_MAPPING = {
   SubCom: 'USA', 'TE SubCom': 'USA', Tyco: 'USA', Simplex: 'USA',
@@ -90,6 +80,31 @@ const ChartBox = ({ h, children }) => {
   return <div ref={ref} style={{ width: '100%', height: h, minHeight: h }}>{ok && <ResponsiveContainer width="100%" height={h}>{children}</ResponsiveContainer>}</div>;
 };
 
+// ── Info Tooltip ──
+const InfoTip = ({ text }) => {
+  const [show, setShow] = useState(false);
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', marginLeft: 6, cursor: 'pointer' }}
+      onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}
+      onClick={() => setShow(p => !p)}>
+      <Info size={13} color="#94a3b8" />
+      {show && (
+        <span style={{
+          position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
+          marginBottom: 6, padding: '8px 12px', background: '#1e293b', color: '#e2e8f0',
+          borderRadius: 8, fontSize: 11, lineHeight: 1.5, width: 240, zIndex: 50,
+          boxShadow: '0 8px 24px rgba(0,0,0,.2)', whiteSpace: 'normal', textAlign: 'left',
+          pointerEvents: 'none',
+        }}>
+          {text}
+          <span style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)',
+            borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '6px solid #1e293b' }} />
+        </span>
+      )}
+    </span>
+  );
+};
+
 // ── Atoms ──
 const ttp = { borderRadius: 8, border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,.08)', fontSize: 12 };
 
@@ -109,11 +124,12 @@ const KPI = ({ title, value, sub, icon: I, color }) => {
   );
 };
 
-const Card = ({ title, icon: I, children, sub }) => (
+const Card = ({ title, icon: I, children, sub, infoTip }) => (
   <div style={{ background: '#fff', padding: '14px 16px', borderRadius: 10, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: sub ? 1 : 8, paddingBottom: sub ? 0 : 8, borderBottom: sub ? 'none' : '1px solid #f1f5f9' }}>
       {I && <I size={14} color="#3b82f6" />}
       <h3 style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', margin: 0 }}>{title}</h3>
+      {infoTip && <InfoTip text={infoTip} />}
     </div>
     {sub && <p style={{ fontSize: 10, color: '#94a3b8', margin: '0 0 6px' }}>{sub}</p>}
     <div style={{ flex: 1, minWidth: 0 }}>{children}</div>
@@ -127,25 +143,16 @@ const Dashboard = ({ data }) => {
   const mob = w < 640;
   const sm = w < 900;
   const md = w < 1200;
+  const g = mob ? 10 : sm ? 12 : 16;
+  const px = mob ? 12 : sm ? 20 : md ? 32 : 48;
 
-  // Inject global CSS on mount
   useEffect(() => {
     const id = '__uts_global';
-    if (!document.getElementById(id)) {
-      const style = document.createElement('style');
-      style.id = id;
-      style.textContent = GLOBAL_CSS;
-      document.head.appendChild(style);
-    }
+    if (!document.getElementById(id)) { const s = document.createElement('style'); s.id = id; s.textContent = GLOBAL_CSS; document.head.appendChild(s); }
   }, []);
 
-  const g = mob ? 10 : sm ? 12 : 16;
-  const px = mob ? 12 : sm ? 20 : md ? 32 : 48; // side padding scales with screen
-
   const grid = (desktop, tablet, mobile) => ({
-    display: 'grid',
-    gridTemplateColumns: mob ? (mobile || '1fr') : sm ? (tablet || desktop) : desktop,
-    gap: g,
+    display: 'grid', gridTemplateColumns: mob ? (mobile || '1fr') : sm ? (tablet || desktop) : desktop, gap: g,
   });
 
   // ── Analytics ──
@@ -199,8 +206,8 @@ const Dashboard = ({ data }) => {
           else if (s.includes('SubCom') || s.includes('Tyco') || s.includes('TE Sub')) { sbe[era].SubCom++; m = true; }
           else if (s.includes('NEC')) { sbe[era].NEC++; m = true; }
           else if (s.includes('HMN') || s.includes('Huawei') || s.includes('Hengtong')) { sbe[era]['HMN Tech']++; m = true; }
+          else if (s !== 'Unknown') { sbe[era].Other++; m = true; }
         });
-        if (!m && sups.some(s => s !== 'Unknown')) sbe[era].Other++;
       }
       if (rfs && rfs > 1990 && rfs < 2030) { if (!yc[rfs]) yc[rfs] = { count: 0, length: 0 }; yc[rfs].count++; yc[rfs].length += len; }
     });
@@ -210,7 +217,8 @@ const Dashboard = ({ data }) => {
 
     return {
       totalCables: data.length, totalLen, active, planned,
-      topCountries: Object.entries(cc).sort((a, b) => b[1] - a[1]).slice(0, 15).map(([n, c]) => ({ name: n, count: c })),
+      // FIX: Top 20 countries instead of 15 — so China, India, Taiwan, Canada all show
+      topCountries: Object.entries(cc).sort((a, b) => b[1] - a[1]).slice(0, 20).map(([n, c]) => ({ name: n, count: c })),
       topSuppliers: Object.entries(sc).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([n, c]) => ({ name: n, count: c })),
       timeline: Object.entries(yc).map(([y, d]) => ({ year: +y, count: d.count, length: d.length })).sort((a, b) => a.year - b.year),
       supplierGeo: Object.entries(sgc).map(([n, v]) => ({ name: n, value: v })).sort((a, b) => b.value - a.value),
@@ -238,13 +246,14 @@ const Dashboard = ({ data }) => {
   const PO = ['#3b82f6', '#6366f1', '#ec4899', '#f59e0b'];
   const PV = ['#ef4444', '#f97316', '#f59e0b', '#10b981', '#3b82f6'];
   const ch = b => mob ? Math.round(b * .75) : sm ? Math.round(b * .85) : b;
+  const wrap = { width: '100%', padding: `0 ${px}px` };
 
   return (
     <div style={{ width: '100%', minHeight: '100vh', background: '#f8fafc', color: '#1e293b', display: 'flex', flexDirection: 'column' }}>
 
       {/* HEADER */}
       <header style={{ width: '100%', background: 'linear-gradient(135deg,#0f172a,#1e293b)', color: '#fff', position: 'sticky', top: 0, zIndex: 30, boxShadow: '0 2px 8px rgba(0,0,0,.2)' }}>
-        <div style={{ width: '100%', padding: `0 ${px}px`, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ ...wrap, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Anchor size={17} color="#60a5fa" />
             <span style={{ fontWeight: 700, fontSize: mob ? 13 : 15, letterSpacing: '-.03em' }}>under_the_sea</span>
@@ -253,7 +262,6 @@ const Dashboard = ({ data }) => {
         </div>
       </header>
 
-      {/* MAIN — full width, padding only */}
       <main style={{ width: '100%', padding: `${mob ? 14 : 24}px ${px}px`, flex: 1 }}>
 
         {/* NETWORK OVERVIEW */}
@@ -281,14 +289,15 @@ const Dashboard = ({ data }) => {
                 </ComposedChart>
               </ChartBox>
             </Card>
-            <Card title="Top 15 Connected Countries" icon={Map}>
-              <ChartBox h={ch(340)}>
+            {/* FIX: Now "Top 20" instead of "Top 15" — China, India, Taiwan, Canada included */}
+            <Card title="Top 20 Connected Countries" icon={Map}>
+              <ChartBox h={ch(400)}>
                 <BarChart data={stats.topCountries} layout="vertical" margin={{ left: 0, right: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                   <XAxis type="number" hide />
-                  <YAxis dataKey="name" type="category" width={mob ? 55 : 85} tick={{ fontSize: 10 }} interval={0} stroke="#94a3b8" />
+                  <YAxis dataKey="name" type="category" width={mob ? 55 : 85} tick={{ fontSize: 9 }} interval={0} stroke="#94a3b8" />
                   <RTooltip contentStyle={ttp} />
-                  <Bar dataKey="count" fill="#6366f1" radius={[0, 4, 4, 0]} barSize={13} />
+                  <Bar dataKey="count" fill="#6366f1" radius={[0, 4, 4, 0]} barSize={12} />
                 </BarChart>
               </ChartBox>
             </Card>
@@ -372,6 +381,7 @@ const Dashboard = ({ data }) => {
                 </BarChart>
               </ChartBox>
             </Card>
+            {/* FIX: Supplier Arms Race — "Other" now counted properly and uses distinct purple color */}
             <Card title="Supplier Arms Race" icon={TrendingUp} sub="Market dominance shifts — who builds the internet?">
               <ChartBox h={ch(300)}>
                 <AreaChart data={stats.supplierEra} margin={{ top: 5, right: 5, left: -12, bottom: 0 }}>
@@ -384,13 +394,15 @@ const Dashboard = ({ data }) => {
                   <Area type="monotone" dataKey="SubCom" stackId="1" stroke="#3b82f6" fill="#3b82f6" fillOpacity={.7} name="SubCom (US)" />
                   <Area type="monotone" dataKey="NEC" stackId="1" stroke="#f43f5e" fill="#f43f5e" fillOpacity={.7} name="NEC (JP)" />
                   <Area type="monotone" dataKey="HMN Tech" stackId="1" stroke="#f59e0b" fill="#f59e0b" fillOpacity={.7} name="HMN Tech (CN)" />
-                  <Area type="monotone" dataKey="Other" stackId="1" stroke="#94a3b8" fill="#94a3b8" fillOpacity={.4} name="Other" />
+                  <Area type="monotone" dataKey="Other" stackId="1" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={.6} name="Other" />
                 </AreaChart>
               </ChartBox>
             </Card>
           </div>
           <div style={{ ...grid('1fr 1fr', '1fr 1fr', '1fr'), marginTop: g }}>
-            <Card title="Who Controls the Pipes?" icon={Users} sub="Ownership concentration — solo vs consortiums">
+            {/* FIX: Info tooltip explaining ownership categorization */}
+            <Card title="Who Controls the Pipes?" icon={Users} sub="Ownership concentration — solo vs consortiums"
+              infoTip="Categorized by the number of distinct owners listed per cable in TeleGeography's data. Solo-owned = 1 entity. Small consortium = 2-3 owners. Consortium = 4-5 owners. Mega-consortium = 6+ owners (e.g. SEA-ME-WE cables with 15+ telcos).">
               <ChartBox h={ch(220)}>
                 <PieChart><Pie data={stats.ownership} innerRadius={mob ? 24 : 32} outerRadius={mob ? 52 : 64} paddingAngle={3} dataKey="value" cx="50%" cy="42%">{stats.ownership.map((_, i) => <Cell key={i} fill={PO[i]} />)}</Pie><RTooltip contentStyle={ttp} /><Legend verticalAlign="bottom" height={40} iconType="circle" wrapperStyle={{ fontSize: 10 }} /></PieChart>
               </ChartBox>
@@ -425,7 +437,7 @@ const Dashboard = ({ data }) => {
             </div>
           </div>
           <div style={{ overflow: 'auto', flex: 1, WebkitOverflowScrolling: 'touch' }}>
-            <table style={{ width: '100%', fontSize: 12, textAlign: 'left', borderCollapse: 'collapse', minWidth: 540 }}>
+            <table style={{ width: '100%', fontSize: 12, textAlign: 'left', borderCollapse: 'collapse', minWidth: 560 }}>
               <thead><tr style={{ background: '#f8fafc', fontSize: 9, textTransform: 'uppercase', color: '#64748b', fontWeight: 600, position: 'sticky', top: 0, zIndex: 10 }}>
                 {['Cable Name', 'RFS', 'Length', 'Points', 'Owners'].map(h => <th key={h} style={{ padding: '7px 12px', borderBottom: '1px solid #e2e8f0' }}>{h}</th>)}
               </tr></thead>
@@ -448,7 +460,7 @@ const Dashboard = ({ data }) => {
 
       {/* FOOTER */}
       <footer style={{ width: '100%', background: '#0f172a', color: '#94a3b8', padding: '14px 0', fontSize: 11, borderTop: '1px solid #1e293b', marginTop: 16 }}>
-        <div style={{ width: '100%', padding: `0 ${px}px`, display: 'flex', flexDirection: mob ? 'column' : 'row', alignItems: mob ? 'flex-start' : 'center', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ ...wrap, display: 'flex', flexDirection: mob ? 'column' : 'row', alignItems: mob ? 'flex-start' : 'center', justifyContent: 'space-between', gap: 8 }}>
           <span>Data sourced from <a href="https://www.submarinecablemap.com/" target="_blank" rel="noreferrer" style={{ color: '#60a5fa', textDecoration: 'none' }}>TeleGeography's</a> publicly available Submarine Cable Map</span>
           <span>&copy; {new Date().getFullYear()} under_the_sea</span>
           <span>Built by <a href="mailto:noam.schlanger@gmail.com" style={{ color: '#60a5fa', textDecoration: 'none' }}>Noam Schlanger</a> <Mail size={10} style={{ verticalAlign: 'middle' }} /></span>
