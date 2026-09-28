@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
 import {
   Activity, Map, Anchor, Server, Calendar,
   TrendingUp, Globe, Search, Zap, Navigation,
@@ -16,16 +16,6 @@ import rawData from './submarine_cables_complete.json';
 let cableData = [];
 if (Array.isArray(rawData)) cableData = rawData;
 else if (rawData && typeof rawData === 'object') cableData = rawData.cables || rawData.data || rawData.features || Object.values(rawData);
-
-const GLOBAL_CSS = `
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body, #root, #app, main, [data-reactroot] {
-    width: 100% !important; max-width: 100% !important;
-    margin: 0 !important; padding: 0 !important; overflow-x: hidden;
-  }
-  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #f8fafc; }
-  @media (max-width: 640px) { html { font-size: 14px; } }
-`;
 
 const GEO_COLORS = { USA: '#3b82f6', Europe: '#10b981', Japan: '#f43f5e', China: '#f59e0b', Other: '#94a3b8' };
 const SUPPLIER_MAPPING = {
@@ -75,22 +65,41 @@ const ChartBox = ({ h, children }) => {
   return <div ref={ref} style={{ width: '100%', height: h, minHeight: h }}>{ok && <ResponsiveContainer width="100%" height={h}>{children}</ResponsiveContainer>}</div>;
 };
 
-/* ── InfoTip: opens DOWNWARD so it's never clipped by card overflow ── */
+/* ── InfoTip: opens downward, nudged horizontally to stay inside the viewport ── */
 const InfoTip = ({ text }) => {
   const [show, setShow] = useState(false);
+  const root = useRef(null), bubble = useRef(null), arrow = useRef(null), hover = useRef(false);
+  useLayoutEffect(() => {
+    if (!show || !bubble.current) return;
+    const r = bubble.current.getBoundingClientRect(), vw = document.documentElement.clientWidth, m = 8;
+    const dx = r.left < m ? m - r.left : r.right > vw - m ? vw - m - r.right : 0;
+    bubble.current.style.transform = `translateX(calc(-50% + ${dx}px))`;
+    arrow.current.style.left = `calc(50% - ${dx}px)`;
+  }, [show]);
+  useEffect(() => {
+    if (!show) return;
+    const close = e => { if (!root.current?.contains(e.target)) setShow(false); };
+    const esc = e => { if (e.key === 'Escape') setShow(false); };
+    document.addEventListener('pointerdown', close);
+    document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('pointerdown', close); document.removeEventListener('keydown', esc); };
+  }, [show]);
   return (
-    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', marginLeft: 5, cursor: 'pointer', zIndex: show ? 100 : 1 }}
-      onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}
-      onClick={() => setShow(p => !p)}>
-      <Info size={13} color="#94a3b8" />
+    <span ref={root} style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', marginLeft: 5, zIndex: show ? 100 : 1 }}
+      onPointerEnter={e => { if (e.pointerType === 'mouse') { hover.current = true; setShow(true); } }}
+      onPointerLeave={e => { if (e.pointerType === 'mouse') { hover.current = false; setShow(false); } }}>
+      <button type="button" className="info-tip" aria-label="More info" aria-expanded={show} onClick={() => setShow(p => hover.current || !p)}
+        style={{ display: 'inline-flex', padding: 4, margin: -4, border: 0, background: 'none', cursor: 'pointer' }}>
+        <Info size={13} color="#94a3b8" />
+      </button>
       {show && (
-        <span style={{
+        <span ref={bubble} role="tooltip" style={{
           position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)',
           marginTop: 8, padding: '10px 14px', background: '#1e293b', color: '#e2e8f0',
-          borderRadius: 8, fontSize: 11, lineHeight: 1.5, width: 260, zIndex: 100,
+          borderRadius: 8, fontSize: 11, fontWeight: 400, lineHeight: 1.5, width: 'min(260px, calc(100vw - 16px))', zIndex: 100,
           boxShadow: '0 8px 24px rgba(0,0,0,.25)', whiteSpace: 'normal', textAlign: 'left',
         }}>
-          <span style={{ position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
+          <span ref={arrow} style={{ position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
             borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '6px solid #1e293b' }} />
           {text}
         </span>
@@ -98,6 +107,11 @@ const InfoTip = ({ text }) => {
     </span>
   );
 };
+
+/* Single-line category tick — Recharts' default wraps multi-word labels like "United States" */
+const LabelTick = ({ x, y, payload, fontSize = 10 }) => (
+  <text x={x} y={y} dy={3} textAnchor="end" fontSize={fontSize} fill="#64748b">{payload.value}</text>
+);
 
 const ttp = { borderRadius: 8, border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,.08)', fontSize: 12 };
 
@@ -136,11 +150,6 @@ const Dashboard = ({ data }) => {
   const mob = w < 640, sm = w < 900, md = w < 1200;
   const g = mob ? 10 : sm ? 12 : 16;
   const px = mob ? 12 : sm ? 20 : md ? 32 : 48;
-
-  useEffect(() => {
-    const id = '__uts_global';
-    if (!document.getElementById(id)) { const s = document.createElement('style'); s.id = id; s.textContent = GLOBAL_CSS; document.head.appendChild(s); }
-  }, []);
 
   const grid = (desktop, tablet, mobile) => ({ display: 'grid', gridTemplateColumns: mob ? (mobile || '1fr') : sm ? (tablet || desktop) : desktop, gap: g });
 
@@ -248,7 +257,7 @@ const Dashboard = ({ data }) => {
         {/* NETWORK OVERVIEW */}
         <section style={{ marginBottom: 32 }}>
           <h2 style={{ fontSize: mob ? 14 : 16, fontWeight: 700, margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 6 }}><Activity size={15} color="#64748b" />Network Overview</h2>
-          <div style={grid('repeat(4,1fr)', 'repeat(4,1fr)', '1fr 1fr')}>
+          <div style={grid('repeat(4,1fr)', 'repeat(2,1fr)', '1fr 1fr')}>
             <KPI title="Total Cable Length" value={`${fmt(stats.totalLen)} km`} sub="Global subsea fiber" icon={Activity} color="#3b82f6" />
             <KPI title="Total Systems" value={stats.totalCables} sub={`${stats.active} Active · ${stats.planned} Planned`} icon={Zap} color="#10b981" />
             <KPI title="Top Hub" value={stats.topCountries[0]?.name || '-'} sub={`${stats.topCountries[0]?.count || 0} connections`} icon={Globe} color="#8b5cf6" />
@@ -257,8 +266,8 @@ const Dashboard = ({ data }) => {
           <div style={{ ...grid('1fr 1fr', '1fr 1fr', '1fr'), marginTop: g }}>
             <Card title="Cable Deployments Over Time" icon={Calendar}
               tip="Number of new cable systems reaching Ready for Service (RFS) each year, with total combined length. Shows both the dot-com era boom of the early 2000s and the current hyperscaler-driven wave.">
-              <ChartBox h={ch(300)}>
-                <ComposedChart data={stats.timeline} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+              <ChartBox h={mob ? ch(300) : ch(400)}>
+                <ComposedChart data={stats.timeline} margin={{ top: 5, right: 0, left: -12, bottom: 0 }}>
                   <defs><linearGradient id="gc" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={.7} /><stop offset="95%" stopColor="#3b82f6" stopOpacity={0} /></linearGradient></defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                   <XAxis dataKey="year" tick={{ fontSize: 10 }} stroke="#94a3b8" />
@@ -277,7 +286,7 @@ const Dashboard = ({ data }) => {
                 <BarChart data={stats.topCountries} layout="vertical" margin={{ left: 0, right: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                   <XAxis type="number" hide />
-                  <YAxis dataKey="name" type="category" width={mob ? 55 : 85} tick={{ fontSize: 9 }} interval={0} stroke="#94a3b8" />
+                  <YAxis dataKey="name" type="category" width={mob ? 80 : 100} tick={<LabelTick fontSize={9} />} interval={0} stroke="#94a3b8" />
                   <RTooltip contentStyle={ttp} />
                   <Bar dataKey="count" fill="#6366f1" radius={[0, 4, 4, 0]} barSize={12} />
                 </BarChart>
@@ -297,7 +306,7 @@ const Dashboard = ({ data }) => {
                 <BarChart data={stats.supplierGeo} layout="vertical" margin={{ left: 5, right: 15 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                   <XAxis type="number" hide />
-                  <YAxis dataKey="name" type="category" width={48} tick={{ fontSize: 10 }} stroke="#94a3b8" />
+                  <YAxis dataKey="name" type="category" width={48} tick={<LabelTick fontSize={10} />} stroke="#94a3b8" />
                   <RTooltip contentStyle={ttp} />
                   <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={18}>
                     {stats.supplierGeo.map((e, i) => <Cell key={i} fill={GEO_COLORS[e.name] || '#94a3b8'} />)}
@@ -342,7 +351,7 @@ const Dashboard = ({ data }) => {
                   <BarChart data={stats.topPlanned} layout="vertical" margin={{ left: 0, right: 8 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                     <XAxis type="number" hide />
-                    <YAxis dataKey="name" type="category" width={mob ? 55 : 80} tick={{ fontSize: 10 }} interval={0} stroke="#94a3b8" />
+                    <YAxis dataKey="name" type="category" width={mob ? 80 : 100} tick={<LabelTick fontSize={mob ? 9 : 10} />} interval={0} stroke="#94a3b8" />
                     <RTooltip contentStyle={ttp} />
                     <Bar dataKey="count" fill="#ec4899" radius={[0, 4, 4, 0]} barSize={11} />
                   </BarChart>
@@ -363,7 +372,7 @@ const Dashboard = ({ data }) => {
                 <BarChart data={stats.corridors} layout="vertical" margin={{ left: 5, right: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                   <XAxis type="number" tick={{ fontSize: 10 }} stroke="#94a3b8" />
-                  <YAxis dataKey="name" type="category" width={mob ? 75 : sm ? 100 : 125} tick={{ fontSize: mob ? 8 : 10 }} interval={0} stroke="#94a3b8" />
+                  <YAxis dataKey="name" type="category" width={mob ? 110 : 145} tick={<LabelTick fontSize={mob ? 9 : 10} />} interval={0} stroke="#94a3b8" />
                   <RTooltip contentStyle={ttp} />
                   <Bar dataKey="count" radius={[0, 4, 4, 0]} barSize={14}>
                     {stats.corridors.map((e, i) => <Cell key={i} fill={RC[e.name.split(' ↔ ')[0]] || '#94a3b8'} />)}
@@ -423,25 +432,25 @@ const Dashboard = ({ data }) => {
         }}>
           <div style={{ padding: mob ? '8px 10px' : '10px 14px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
             <h3 style={{ fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 5, margin: 0, fontSize: 13, whiteSpace: 'nowrap' }}><Navigation size={13} /> Cable Database</h3>
-            <div style={{ position: 'relative', width: mob ? '100%' : 200, flexShrink: 0 }}>
+            <div style={{ position: 'relative', width: mob ? '100%' : 240, flexShrink: 0 }}>
               <Search size={12} color="#94a3b8" style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)' }} />
-              <input type="text" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)}
-                style={{ paddingLeft: 26, paddingRight: 8, paddingTop: 5, paddingBottom: 5, borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 12, width: '100%', outline: 'none', background: '#fff', boxSizing: 'border-box' }} />
+              <input type="search" className="cable-search" aria-label="Search cables" placeholder="Search name, owner, country…" value={search} onChange={e => setSearch(e.target.value)}
+                style={{ paddingLeft: 26, paddingRight: 8, paddingTop: 5, paddingBottom: 5, borderRadius: 6, border: '1px solid #cbd5e1', fontSize: mob ? 16 : 12, width: '100%', outline: 'none', background: '#fff', boxSizing: 'border-box' }} />
             </div>
           </div>
           <div style={{ overflow: 'auto', flex: 1, WebkitOverflowScrolling: 'touch' }}>
             <table style={{ width: '100%', fontSize: 12, textAlign: 'left', borderCollapse: 'collapse', minWidth: 560 }}>
-              <thead><tr style={{ background: '#f8fafc', fontSize: 9, textTransform: 'uppercase', color: '#64748b', fontWeight: 600, position: 'sticky', top: 0, zIndex: 10 }}>
-                {['Cable Name', 'RFS', 'Length', 'Points', 'Owners'].map(h => <th key={h} style={{ padding: '7px 12px', borderBottom: '1px solid #e2e8f0' }}>{h}</th>)}
+              <thead><tr style={{ fontSize: 9, textTransform: 'uppercase', color: '#64748b', fontWeight: 600 }}>
+                {['Cable Name', 'RFS', 'Length', 'Points', 'Owners'].map(h => <th key={h} style={{ padding: '7px 12px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', position: 'sticky', top: 0, zIndex: 10 }}>{h}</th>)}
               </tr></thead>
               <tbody>
                 {filtered.map((c, i) => (
-                  <tr key={c.id || i} style={{ borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <tr key={c.id || i} className="cable-row" style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ padding: '7px 12px', fontWeight: 500, color: '#3b82f6', whiteSpace: 'nowrap' }}>{c.name}{c.is_planned && <span style={{ marginLeft: 4, padding: '0 4px', borderRadius: 3, fontSize: 8, fontWeight: 600, background: '#fef3c7', color: '#92400e' }}>PLANNED</span>}</td>
                     <td style={{ padding: '7px 12px', color: '#64748b', fontFamily: 'monospace', fontSize: 10 }}>{c.rfs_year || 'TBD'}</td>
                     <td style={{ padding: '7px 12px', color: '#64748b', fontFamily: 'monospace', fontSize: 10 }}>{c.length ? fmt(parseLen(c.length)) : '-'}</td>
-                    <td style={{ padding: '7px 12px', color: '#64748b', fontSize: 10 }}><b style={{ color: '#475569' }}>{c.landing_points?.length || 0}</b> <span style={{ color: '#94a3b8' }}>{c.landing_points?.slice(0, 2).map(p => p.country).join(', ')}{c.landing_points?.length > 2 && '…'}</span></td>
-                    <td style={{ padding: '7px 12px', color: '#64748b', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.owners || '-'}</td>
+                    <td style={{ padding: '7px 12px', color: '#64748b', fontSize: 10 }}><b style={{ color: '#475569' }}>{c.landing_points?.length || 0}</b> <span style={{ color: '#94a3b8' }}>{(() => { const u = [...new Set((c.landing_points || []).map(p => p.country).filter(Boolean))]; return u.slice(0, 2).join(', ') + (u.length > 2 ? '…' : ''); })()}</span></td>
+                    <td title={c.owners || undefined} style={{ padding: '7px 12px', color: '#64748b', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.owners || '-'}</td>
                   </tr>
                 ))}
               </tbody>
